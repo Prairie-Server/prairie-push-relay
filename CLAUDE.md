@@ -8,6 +8,7 @@ legacy Go/PostgreSQL/Redis implementation lives on `legacy/go-relay`.
 ```sh
 pnpm install
 pnpm run check
+pnpm run lint
 pnpm test
 pnpm exec wrangler deploy --dry-run
 pnpm run deploy

@@ -8,19 +8,21 @@ This is the production Cloudflare Worker behind `push.prairie-server.org`. Code 
 
 - `pnpm install --frozen-lockfile` installs pinned dependencies.
 - `pnpm run check` type-checks both `src/` and `test/` without emitting files.
+- `pnpm run lint` runs type-aware ESLint on `src/` and `test/`.
 - `pnpm test` runs the Vitest Worker suite once; `pnpm run test:watch` reruns tests during development.
+- `pnpm run test:coverage` documents why V8 coverage is unsupported under the Workers Vitest pool and exits non-zero.
 - `pnpm dev` starts a local Wrangler session using values from `.dev.vars`.
 - `pnpm exec wrangler deploy --dry-run` verifies the production bundle without publishing it.
 
-Run `pnpm run check`, `pnpm test`, and the Wrangler dry run before opening a pull request. Use `pnpm run deploy` only when explicitly authorized to publish production.
+Run `pnpm run check`, `pnpm run lint`, `pnpm test`, and the Wrangler dry run before opening a pull request. Use `pnpm run deploy` only when explicitly authorized to publish production.
 
 ## Coding Style & Naming Conventions
 
-Use strict TypeScript and ES modules. Match the existing style: two-space indentation, double quotes, semicolons, trailing commas in multiline constructs, `camelCase` functions and variables, `PascalCase` classes and interfaces, and `UPPER_SNAKE_CASE` constants. File names use lowercase kebab case, such as `provider-token-object.ts`. No formatter or linter is configured, so match adjacent code and rely on `tsc` plus review.
+Use strict TypeScript and ES modules. Match the existing style: two-space indentation, double quotes, semicolons, trailing commas in multiline constructs, `camelCase` functions and variables, `PascalCase` classes and interfaces, and `UPPER_SNAKE_CASE` constants. File names use lowercase kebab case, such as `provider-token-object.ts`. Prefer `pnpm run lint` plus `tsc` for style and type safety. `typescript` is aliased to `@typescript/typescript6` so type-aware ESLint works while TypeScript 7.0 is still API-less; `typescript7` provides the `tsc` binary used by `pnpm run check`.
 
 ## Testing Guidelines
 
-Tests use Vitest with `@cloudflare/vitest-pool-workers`; name files `*.test.ts` under `test/`. Add regression coverage for changes to routes, validation, APNs response mapping, quotas, idempotency, or Durable Object alarms. Tests run sequentially because fixtures share Worker and Durable Object state. There is no numeric coverage threshold, but new behavior and failure modes should be exercised.
+Tests use Vitest with `@cloudflare/vitest-pool-workers`; name files `*.test.ts` under `test/`. Add regression coverage for changes to routes, validation, APNs response mapping, quotas, idempotency, or Durable Object alarms. Tests run sequentially because fixtures share Worker and Durable Object state. `@vitest/coverage-v8` cannot instrument this pool (`node:inspector/promises` fails to resolve), so CI uses ESLint instead of a numeric coverage floor.
 
 ## Commit & Pull Request Guidelines
 

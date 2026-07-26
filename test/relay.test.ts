@@ -504,11 +504,13 @@ describe("relay worker", () => {
       appleRequest(EXPIRED_PROVIDER_TOKEN),
     );
     expect(response.status).toBe(200);
-    expect(await response.json<{ status: string; apns_id: string }>()).toEqual({
+    const body = await response.json<{ status: string; apns_id: string; request_id: string }>();
+    expect(body).toEqual({
       status: "accepted",
       apns_id: `accepted-${EXPIRED_PROVIDER_TOKEN.slice(0, 8)}-2`,
-      request_id: expect.any(String),
+      request_id: body.request_id,
     });
+    expect(typeof body.request_id).toBe("string");
   });
 
   it("converts abandoned dispatches to unknown instead of resending", async () => {
@@ -965,11 +967,13 @@ describe("relay worker", () => {
       ...fcmRequest(FCM_EXPIRED_AUTH_TOKEN),
     });
     expect(response.status).toBe(200);
-    expect(await response.json<{ status: string; fcm_message_id: string }>()).toEqual({
+    const body = await response.json<{ status: string; fcm_message_id: string; request_id: string }>();
+    expect(body).toEqual({
       status: "accepted",
       fcm_message_id: `accepted-${FCM_EXPIRED_AUTH_TOKEN.slice(0, 8)}-2`,
-      request_id: expect.any(String),
+      request_id: body.request_id,
     });
+    expect(typeof body.request_id).toBe("string");
   });
 
   it("keeps FCM sends compatible with capabilities issued before the fcm:send scope", async () => {
