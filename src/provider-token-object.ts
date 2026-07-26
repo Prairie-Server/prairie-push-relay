@@ -129,11 +129,18 @@ async function mintFcmAccessToken(env: Env, issuedAt: number): Promise<string> {
   if (!response.ok) {
     throw new Error(`google_token_exchange_failed_${response.status}`);
   }
-  const parsed = (await response.json()) as { access_token?: unknown };
-  if (typeof parsed.access_token !== "string" || parsed.access_token.length === 0) {
+  const parsed: unknown = await response.json();
+  const accessToken =
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "access_token" in parsed &&
+    typeof parsed.access_token === "string"
+      ? parsed.access_token
+      : undefined;
+  if (!accessToken) {
     throw new Error("google_token_exchange_malformed");
   }
-  return parsed.access_token;
+  return accessToken;
 }
 
 function pemBytes(pem: string, name: string): Uint8Array {

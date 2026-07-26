@@ -97,8 +97,12 @@ async function readBoundedBody(request: Request, maxBytes: number): Promise<Uint
   let total = 0;
   try {
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+      const result = await reader.read();
+      if (result.done) break;
+      const value: unknown = result.value;
+      if (!(value instanceof Uint8Array)) {
+        throw new TypeError("unexpected request body chunk type");
+      }
       total += value.byteLength;
       if (total > maxBytes) {
         await reader.cancel("request body is too large");
