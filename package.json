@@ -1,5 +1,5 @@
 {
-  "name": "@silo/push-relay-worker",
+  "name": "@prairie/push-relay-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",

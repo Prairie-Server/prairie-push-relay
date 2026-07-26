@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This repository is the production Cloudflare Worker push relay for Silo. The
+This repository is the production Cloudflare Worker push relay for Prairie. The
 legacy Go/PostgreSQL/Redis implementation lives on `legacy/go-relay`.
 
 ## Commands
@@ -26,7 +26,7 @@ pnpm run deploy
   assertion for a Google OAuth access token.
 - `src/apns.ts` and `src/fcm.ts` build fixed content-private payloads and map
   upstream responses into one shared result shape.
-- Production is deployed at `push.siloserver.org`; `workers.dev` and preview
+- Production is deployed at `push.prairie-server.org`; `workers.dev` and preview
   URLs are disabled in `wrangler.jsonc`.
 
 ## Privacy and reliability invariants

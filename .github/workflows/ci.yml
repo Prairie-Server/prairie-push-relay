@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://push.siloserver.org
+      url: https://push.prairie-server.org
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
@@ -63,4 +63,4 @@ jobs:
           wranglerVersion: 4.110.0
           command: deploy
       - name: Verify production health
-        run: curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://push.siloserver.org/healthz
+        run: curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://push.prairie-server.org/healthz

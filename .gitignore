@@ -18,3 +18,4 @@ key.json
 .codex/
 .DS_Store
 bin/
+node_modules

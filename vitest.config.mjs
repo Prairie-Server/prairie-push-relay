@@ -75,7 +75,7 @@ async function handleFcmRequest(request, url) {
   if (
     !token ||
     message.notification !== undefined ||
-    dataKeys.join(",") !== "silo_delivery_id,silo_mode" ||
+    dataKeys.join(",") !== "prairie_delivery_id,prairie_mode" ||
     !["HIGH", "NORMAL"].includes(message?.android?.priority) ||
     Object.keys(body).some((field) => field !== "message")
   ) {
@@ -129,7 +129,7 @@ export default defineConfig({
             return new Response(JSON.stringify({ reason: "MissingProviderToken" }), { status: 403 });
           }
           if (
-            request.headers.get("apns-topic") !== "org.siloserver.silo" ||
+            request.headers.get("apns-topic") !== "org.prairieserver.prairie" ||
             !["alert", "background"].includes(request.headers.get("apns-push-type") ?? "")
           ) {
             return new Response(JSON.stringify({ reason: "BadTopic" }), { status: 400 });
@@ -139,8 +139,8 @@ export default defineConfig({
             !payload ||
             typeof payload !== "object" ||
             !payload.aps ||
-            !payload.silo_delivery_id ||
-            Object.keys(payload).some((field) => !["aps", "silo_delivery_id"].includes(field))
+            !payload.prairie_delivery_id ||
+            Object.keys(payload).some((field) => !["aps", "prairie_delivery_id"].includes(field))
           ) {
             return new Response(JSON.stringify({ reason: "BadPayload" }), { status: 400 });
           }

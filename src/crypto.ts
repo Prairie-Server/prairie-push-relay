@@ -3,7 +3,7 @@ import type { AppleSendRequest, CapabilityClaims, FcmSendRequest } from "./types
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const CAPABILITY_TYPE = "silo-relay-cap+jwt";
+const CAPABILITY_TYPE = "prairie-relay-cap+jwt";
 const CAPABILITY_SCOPE = [
   "apns:send",
   "fcm:send",
