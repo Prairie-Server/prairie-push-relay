@@ -170,12 +170,12 @@ function buildPayload(request: AppleSendRequest): {
   if (request.badge !== undefined) aps.badge = request.badge;
   const payload: Record<string, unknown> = {
     aps,
-    silo_delivery_id: request.delivery_id,
+    prairie_delivery_id: request.delivery_id,
   };
   if (request.mode === "background_wake") {
     return { body: JSON.stringify(payload), pushType: "background", priority: "5" };
   }
-  aps.alert = { title: "Silo", body: "New notification available" };
+  aps.alert = { title: "Prairie", body: "New notification available" };
   aps["mutable-content"] = 1;
   aps.sound = "default";
   return { body: JSON.stringify(payload), pushType: "alert", priority: "10" };

@@ -40,7 +40,7 @@ function appleRequest(token = ACCEPT_TOKEN, deliveryId = crypto.randomUUID()): A
   return {
     token,
     environment: "sandbox",
-    topic: "org.siloserver.silo",
+    topic: "org.prairieserver.prairie",
     mode: "private_alert",
     server_device_id: crypto.randomUUID(),
     delivery_id: deliveryId,
@@ -114,7 +114,7 @@ describe("relay worker", () => {
     expect(registration.deployment_id).toMatch(/^[0-9a-f-]{36}$/u);
     expect(registration.api_key.split(".")).toHaveLength(3);
     expect(registration.key_prefix).toMatch(/^cap_v1_/u);
-    expect(registration.apns_topics).toEqual(["org.siloserver.silo"]);
+    expect(registration.apns_topics).toEqual(["org.prairieserver.prairie"]);
     expect(Date.parse(registration.expires_at)).toBeGreaterThan(Date.now());
 
     const response = await SELF.fetch("https://relay.test/v1/deployments/register", {
@@ -908,7 +908,7 @@ describe("relay worker", () => {
     const registration = await register();
     const withTopic = await sendFcm(registration.api_key, crypto.randomUUID(), {
       ...fcmRequest(),
-      topic: "org.siloserver.silo",
+      topic: "org.prairieserver.prairie",
     });
     expect(withTopic.status).toBe(400);
     expect((await withTopic.json<ErrorEnvelope>()).error.code).toBe("unexpected_field");

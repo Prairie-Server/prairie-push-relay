@@ -115,8 +115,8 @@ function prepareFCMRequest(
   const message: Record<string, unknown> = {
     token: request.token,
     data: {
-      silo_delivery_id: request.delivery_id,
-      silo_mode: request.mode,
+      prairie_delivery_id: request.delivery_id,
+      prairie_mode: request.mode,
     },
     android: {
       priority: request.mode === "background_wake" ? "NORMAL" : "HIGH",
