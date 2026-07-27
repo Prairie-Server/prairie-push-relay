@@ -1,11 +1,19 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>prairie-server/prairie-server//renovate-presets/default"],
-  "enabledManagers": ["github-actions", "npm"],
+  "extends": [
+    "github>prairie-server/prairie-server//renovate-presets/default"
+  ],
+  "forkProcessing": "enabled",
+  "enabledManagers": [
+    "github-actions",
+    "npm"
+  ],
   "packageRules": [
     {
       "description": "Keep GitHub Actions SHA-pinned in this repo",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": true
     }
   ]
