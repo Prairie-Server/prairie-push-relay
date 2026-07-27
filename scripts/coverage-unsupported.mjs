@@ -5,7 +5,7 @@
  * node:inspector/promises, which the Workers test runtime cannot load
  * (tests fail before any suite runs; coverage stays at 0/0).
  *
- * Quality gate instead: `pnpm run lint` (type-aware ESLint) + `pnpm test`.
+ * Quality gate instead: `pnpm run lint` (type-aware Oxlint) + `pnpm test`.
  * Revisit when Cloudflare documents a supported coverage path for the pool.
  */
 console.error(`test:coverage is unsupported under @cloudflare/vitest-pool-workers.

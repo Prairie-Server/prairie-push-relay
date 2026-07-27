@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript"],
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    ".wrangler/**",
+    "coverage/**",
+    "dist/**",
+    "vitest.config.mjs"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "typescript/require-await": "off",
+    "typescript/no-misused-promises": [
+      "error",
+      { "checksVoidReturn": { "attributes": false } }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.ts", "test/**/*.ts"]
+    }
+  ]
+}
