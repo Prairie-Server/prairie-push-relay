@@ -2,9 +2,9 @@ name: CI and deploy
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, production]
   push:
-    branches: [main]
+    branches: [main, production]
   workflow_dispatch:
 
 permissions:
@@ -36,14 +36,14 @@ jobs:
       - run: pnpm exec wrangler deploy --dry-run
 
   deploy:
-    name: Deploy production
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    name: Deploy ${{ github.ref_name == 'production' && 'production' || 'development' }}
+    if: github.event_name != 'pull_request'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
-      name: production
-      url: https://push.prairie-server.org
+      name: ${{ github.ref_name == 'production' && 'production' || 'development' }}
+      url: ${{ github.ref_name == 'production' && 'https://push.prairie-server.org' || 'https://push.dev.prairie-server.org' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -62,6 +62,12 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: pnpm
           wranglerVersion: 4.110.0
-          command: deploy
-      - name: Verify production health
-        run: curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://push.prairie-server.org/healthz
+          command: ${{ github.ref_name == 'production' && 'deploy' || 'deploy --env development' }}
+      - name: Verify deployment health
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "production" ]]; then
+            url="https://push.prairie-server.org/healthz"
+          else
+            url="https://push.dev.prairie-server.org/healthz"
+          fi
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 "$url"
