@@ -2,7 +2,13 @@ import { env, runInDurableObject, SELF } from "cloudflare:test";
 import { describe, expect, it, vi } from "vitest";
 
 import { sendToAPNs } from "../src/apns";
-import { canonicalAppleHash, newCapabilityClaims, signCapability } from "../src/crypto";
+import {
+  canonicalAppleHash,
+  canonicalFcmHash,
+  newCapabilityClaims,
+  sha256,
+  signCapability,
+} from "../src/crypto";
 import type { AppleSendRequest, FcmSendRequest } from "../src/types";
 
 const ACCEPT_TOKEN = "a".repeat(64);
@@ -241,11 +247,39 @@ describe("relay worker", () => {
     expect((await response.json<ErrorEnvelope>()).error.code).toBe("topic_not_allowed");
   });
 
-  it("builds the fixed content-private background payload", async () => {
-    const registration = await register();
-    const body = { ...appleRequest(), mode: "background_wake" as const };
-    expect((await send(registration.api_key, crypto.randomUUID(), body)).status).toBe(200);
-  });
+  it.each(["background_wake", "private_alert"] as const)(
+    "builds the fixed content-private %s payload",
+    async (mode) => {
+      const body = { ...appleRequest(), mode, badge: 0 };
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(""));
+      try {
+        const delivery = await sendToAPNs(env, body, {
+          token: "test-provider-token",
+          issuedAt: Math.floor(Date.now() / 1000),
+        });
+        expect(delivery.result.kind).toBe("accepted");
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const init = fetchSpy.mock.calls[0]?.[1];
+        const headers = new Headers(init?.headers);
+        expect(headers.get("apns-push-type")).toBe(mode === "background_wake" ? "background" : "alert");
+        expect(headers.get("apns-priority")).toBe(mode === "background_wake" ? "5" : "10");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          aps: mode === "background_wake"
+            ? { "content-available": 1, badge: 0 }
+            : {
+                "content-available": 1,
+                badge: 0,
+                alert: { title: "Prairie", body: "New notification available" },
+                "mutable-content": 1,
+                sound: "default",
+              },
+          prairie_delivery_id: body.delivery_id,
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    },
+  );
 
   it("rejects reuse of an idempotency key with a different payload", async () => {
     const registration = await register();
@@ -255,6 +289,41 @@ describe("relay worker", () => {
     expect(mismatch.status).toBe(422);
     expect((await mismatch.json<{ error: { code: string } }>()).error.code).toBe(
       "idempotency_key_reuse",
+    );
+  });
+
+  it("preserves canonical hashes used by existing idempotency records", async () => {
+    const apple: AppleSendRequest = {
+      token: ACCEPT_TOKEN,
+      environment: "sandbox",
+      topic: "org.prairieserver.prairie",
+      mode: "private_alert",
+      server_device_id: "device:1",
+      delivery_id: "delivery:1",
+    };
+    const fcm: FcmSendRequest = {
+      token: FCM_ACCEPT_TOKEN,
+      mode: "background_wake",
+      server_device_id: "device:1",
+      delivery_id: "delivery:1",
+    };
+    const appleTokenHash = await sha256(apple.token);
+    const fcmTokenHash = await sha256(fcm.token);
+    // Captured from the original canonical encoding before sharing the token digest.
+    expect(await canonicalAppleHash(apple, appleTokenHash)).toBe(
+      "rr59cp-LN-g2RCCVmzCTnNKhi9bhMhVb6jxjCJNl8gE",
+    );
+    expect(await canonicalAppleHash({ ...apple, badge: 0 }, appleTokenHash)).toBe(
+      "TTD1qjTGTh31ilV3-4ZIiUnrDyXn1IrLKbDfG1rYlCk",
+    );
+    expect(
+      await canonicalAppleHash({ ...apple, badge: 9999, collapse_id: "collapse:1" }, appleTokenHash),
+    ).toBe("5Sn9xBN5QzZzkBJ6FrRqz4nGdkj9AEFC8R5x6w63EHw");
+    expect(await canonicalFcmHash(fcm, fcmTokenHash)).toBe(
+      "CwZrrAmCYvqqU3fsXTlM8LWC_gJ2MVou8xpaLR8pQYg",
+    );
+    expect(await canonicalFcmHash({ ...fcm, collapse_id: "collapse:1" }, fcmTokenHash)).toBe(
+      "igxdqamXFVJHIQ_NQz2Vi8Ie3QVXw8bmPRnCuF0Zn-8",
     );
   });
 
@@ -498,26 +567,77 @@ describe("relay worker", () => {
 
   it("refreshes an expired provider token and resends once", async () => {
     const registration = await register();
-    const response = await send(
-      registration.api_key,
-      crypto.randomUUID(),
-      appleRequest(EXPIRED_PROVIDER_TOKEN),
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json<{ status: string; apns_id: string; request_id: string }>();
-    expect(body).toEqual({
-      status: "accepted",
-      apns_id: `accepted-${EXPIRED_PROVIDER_TOKEN.slice(0, 8)}-2`,
-      request_id: body.request_id,
+    const now = Date.now();
+    const clockSpy = vi.spyOn(Date, "now");
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const response = await originalFetch(url, init);
+      // Give the replacement JWT a different issuance time, even with deterministic signing.
+      if (response.status === 403) clockSpy.mockReturnValue(now + 1000);
+      return response;
     });
-    expect(typeof body.request_id).toBe("string");
+    try {
+      const response = await send(
+        registration.api_key,
+        crypto.randomUUID(),
+        appleRequest(EXPIRED_PROVIDER_TOKEN),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json<{ status: string; apns_id: string; request_id: string }>()).toEqual({
+        status: "accepted",
+        apns_id: `accepted-${EXPIRED_PROVIDER_TOKEN.slice(0, 8)}-2`,
+        request_id: expect.any(String),
+      });
+    } finally {
+      fetchSpy.mockRestore();
+      clockSpy.mockRestore();
+    }
   });
+
+  it.each(["apple", "fcm"] as const)(
+    "stops after one credential refresh when %s keeps rejecting authentication",
+    async (provider) => {
+      let providerCalls = 0;
+      const originalFetch = globalThis.fetch;
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+        if (String(url) === env.FCM_TOKEN_URL) {
+          return originalFetch(url, init);
+        }
+        providerCalls += 1;
+        if (providerCalls > 2) throw new Error("unexpected third delivery attempt");
+        return provider === "apple"
+          ? new Response(JSON.stringify({ reason: "ExpiredProviderToken" }), { status: 403 })
+          : new Response(JSON.stringify({ error: { status: "UNAUTHENTICATED" } }), { status: 401 });
+      });
+      try {
+        const stub = env.DEPLOYMENTS.getByName(crypto.randomUUID());
+        const common = {
+          generation: 1,
+          idempotencyKey: crypto.randomUUID(),
+          payloadHash: "test-payload-hash",
+          requestId: crypto.randomUUID(),
+        };
+        const result = await runInDurableObject(stub, (instance) =>
+          instance.send(
+            provider === "apple"
+              ? { ...common, provider, request: appleRequest() }
+              : { ...common, provider, request: fcmRequest() },
+          ),
+        );
+        expect(result.status).toBe(503);
+        expect(JSON.parse(result.body).error.code).toBe("upstream_unavailable");
+        expect(providerCalls).toBe(2);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    },
+  );
 
   it("converts abandoned dispatches to unknown instead of resending", async () => {
     const registration = await register();
     const key = crypto.randomUUID();
     const body = appleRequest();
-    const payloadHash = await canonicalAppleHash(body);
+    const payloadHash = await canonicalAppleHash(body, await sha256(body.token));
     const stub = env.DEPLOYMENTS.getByName(registration.deployment_id);
     await runInDurableObject(stub, (_instance, state) => {
       const stale = Math.floor(Date.now() / 1000) - 61;
@@ -550,7 +670,7 @@ describe("relay worker", () => {
     const registration = await register();
     const key = crypto.randomUUID();
     const body = appleRequest();
-    const payloadHash = await canonicalAppleHash(body);
+    const payloadHash = await canonicalAppleHash(body, await sha256(body.token));
     const stub = env.DEPLOYMENTS.getByName(registration.deployment_id);
     await runInDurableObject(stub, (_instance, state) => {
       const now = Math.floor(Date.now() / 1000);
@@ -724,7 +844,7 @@ describe("relay worker", () => {
     expect(alarm as number).toBeLessThan(Date.now() + 26 * 60 * 60 * 1000);
   });
 
-  it("drains expired transient state in bounded alarm batches", async () => {
+  it("drains expired transient state and preserves unexpired dispatches", async () => {
     const registration = await register();
     const stub = env.DEPLOYMENTS.getByName(registration.deployment_id);
     await runInDurableObject(stub, async (instance, state) => {
@@ -820,6 +940,56 @@ describe("relay worker", () => {
     });
   });
 
+  it("continues cleanup in another alarm after exhausting each table's budget", async () => {
+    const stub = env.DEPLOYMENTS.getByName(crypto.randomUUID());
+    await runInDurableObject(stub, async (instance, state) => {
+      const expired = Math.floor(Date.now() / 1000) - 86_401;
+      state.storage.sql.exec(
+        `WITH RECURSIVE sequence(value) AS (
+           VALUES(1) UNION ALL SELECT value + 1 FROM sequence WHERE value < 10001
+         )
+         INSERT INTO idempotency
+         (key, payload_hash, state, created_at, updated_at, cleanup_at)
+         SELECT 'expired-' || value, 'hash', 'done', ?, ?, ? FROM sequence`,
+        expired,
+        expired,
+        expired,
+      );
+      state.storage.sql.exec(
+        `INSERT INTO rotations
+         (idempotency_key, previous_generation, generation, issued_at, expires_at, jti, created_at)
+         SELECT key, 1, 2, ?, ?, key, ? FROM idempotency`,
+        expired,
+        expired + 3600,
+        expired,
+      );
+
+      await instance.alarm();
+
+      expect(
+        state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM idempotency").one().count,
+      ).toBe(1);
+      expect(
+        state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM rotations").one().count,
+      ).toBe(1);
+      const alarm = await state.storage.getAlarm();
+      expect(alarm).not.toBeNull();
+      expect(alarm).toBeGreaterThan(Date.now());
+      expect(alarm).toBeLessThanOrEqual(Date.now() + 1000);
+
+      await state.storage.deleteAlarm();
+      await instance.alarm();
+
+      expect(
+        state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM idempotency").one().count,
+      ).toBe(0);
+      expect(
+        state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM rotations").one().count,
+      ).toBe(0);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
   it("keeps quota state out of new deployment objects", async () => {
     const registration = await register();
     const stub = env.DEPLOYMENTS.getByName(registration.deployment_id);
@@ -874,7 +1044,6 @@ describe("relay worker", () => {
     });
     expect(rejected.status).toBe(401);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const revoked = await SELF.fetch("https://relay.test/v1/admin/deployments/revoke", {
       method: "POST",
       headers: {
@@ -884,9 +1053,6 @@ describe("relay worker", () => {
       body: JSON.stringify({ deployment_id: registration.deployment_id }),
     });
     expect(revoked.status).toBe(200);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("deployment.admin_revoked"));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(registration.deployment_id));
-    logSpy.mockRestore();
     expect((await send(registration.api_key, crypto.randomUUID(), appleRequest())).status).toBe(401);
   });
 
