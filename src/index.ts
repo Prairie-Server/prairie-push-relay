@@ -76,14 +76,7 @@ export default {
         return handleFcmSend(request, env, requestId);
       }
       return errorResponse(404, "not_found", "not found", requestId);
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: "request.failed",
-          request_id: requestId,
-          error: error instanceof Error ? error.name : "unknown_error",
-        }),
-      );
+    } catch {
       return errorResponse(500, "internal_error", "internal server error", requestId);
     }
   },
@@ -203,13 +196,6 @@ async function handleAdminRevoke(request: Request, env: Env, requestId: string):
     return errorResponse(400, "invalid_field", "deployment_id must be 1-128 characters", requestId);
   }
   await env.DEPLOYMENTS.getByName(deploymentId).disable();
-  console.log(
-    JSON.stringify({
-      event: "deployment.admin_revoked",
-      request_id: requestId,
-      deployment_id: deploymentId,
-    }),
-  );
   return jsonResponse(200, { request_id: requestId, deployment_id: deploymentId, status: "revoked" });
 }
 
@@ -238,10 +224,7 @@ async function handleAppleSend(request: Request, env: Env, requestId: string): P
     );
   }
 
-  const [payloadHash, tokenHash] = await Promise.all([
-    canonicalAppleHash(appleRequest),
-    sha256(appleRequest.token),
-  ]);
+  const tokenHash = await sha256(appleRequest.token);
   const deviceLimited = await enforceRateLimit({
     limiter: env.DEVICE_RATE_LIMITER,
     key: `${claims.sub}:${tokenHash}`,
@@ -253,6 +236,7 @@ async function handleAppleSend(request: Request, env: Env, requestId: string): P
     deploymentId: claims.sub,
   });
   if (deviceLimited) return deviceLimited;
+  const payloadHash = await canonicalAppleHash(appleRequest, tokenHash);
   const result = await env.DEPLOYMENTS.getByName(claims.sub).send({
     provider: "apple",
     generation: claims.ver,
@@ -285,10 +269,7 @@ async function handleFcmSend(request: Request, env: Env, requestId: string): Pro
   // No topic allowlist: the relay only holds credentials for its own Firebase
   // project, so the project itself is the delivery boundary.
 
-  const [payloadHash, tokenHash] = await Promise.all([
-    canonicalFcmHash(fcmRequest),
-    sha256(fcmRequest.token),
-  ]);
+  const tokenHash = await sha256(fcmRequest.token);
   const deviceLimited = await enforceRateLimit({
     limiter: env.DEVICE_RATE_LIMITER,
     key: `${claims.sub}:${tokenHash}`,
@@ -300,6 +281,7 @@ async function handleFcmSend(request: Request, env: Env, requestId: string): Pro
     deploymentId: claims.sub,
   });
   if (deviceLimited) return deviceLimited;
+  const payloadHash = await canonicalFcmHash(fcmRequest, tokenHash);
   const result = await env.DEPLOYMENTS.getByName(claims.sub).send({
     provider: "fcm",
     generation: claims.ver,
