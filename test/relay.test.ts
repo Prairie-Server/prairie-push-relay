@@ -263,7 +263,7 @@ describe("relay worker", () => {
         const headers = new Headers(init?.headers);
         expect(headers.get("apns-push-type")).toBe(mode === "background_wake" ? "background" : "alert");
         expect(headers.get("apns-priority")).toBe(mode === "background_wake" ? "5" : "10");
-        expect(JSON.parse(String(init?.body))).toEqual({
+        expect(JSON.parse(typeof init?.body === "string" ? init.body : "null")).toEqual({
           aps: mode === "background_wake"
             ? { "content-available": 1, badge: 0 }
             : {
@@ -600,7 +600,7 @@ describe("relay worker", () => {
       let providerCalls = 0;
       const originalFetch = globalThis.fetch;
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-        if (String(url) === env.FCM_TOKEN_URL) {
+        if ((url instanceof Request ? url.url : url.toString()) === env.FCM_TOKEN_URL) {
           return originalFetch(url, init);
         }
         providerCalls += 1;
