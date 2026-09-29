@@ -76,7 +76,17 @@ export default {
         return handleFcmSend(request, env, requestId);
       }
       return errorResponse(404, "not_found", "not found", requestId);
-    } catch {
+    } catch (error) {
+      // Only the exception name and request id: never request content. Workers
+      // observability is off (wrangler.jsonc), so this is visible only in local
+      // `wrangler dev` output or a live `wrangler tail`.
+      console.error(
+        JSON.stringify({
+          event: "request.failed",
+          request_id: requestId,
+          error: error instanceof Error ? error.name : "unknown_error",
+        }),
+      );
       return errorResponse(500, "internal_error", "internal server error", requestId);
     }
   },
