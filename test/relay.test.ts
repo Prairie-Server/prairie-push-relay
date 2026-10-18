@@ -338,7 +338,7 @@ describe("relay worker", () => {
         });
         expect(delivery.result.kind).toBe("accepted");
         expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const { message } = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body));
+        const { message } = JSON.parse(fetchSpy.mock.calls[0]?.[1]?.body as string);
         expect(message.notification).toBeUndefined();
         expect(message.data).toEqual({
           prairie_delivery_id: body.delivery_id,
