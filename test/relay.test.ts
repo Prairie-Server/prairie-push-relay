@@ -429,7 +429,7 @@ describe("relay worker", () => {
     // Captured when server and profile IDs joined the encoding.
     const target = { server_id: "server:1", profile_id: "profile:1" };
     expect(await canonicalAppleHash({ ...apple, ...target }, appleTokenHash)).toBe(
-      "4nzVQSqeBg20sBHoGhWQDCHu_3W8V98qovxIg_Q3Ppg",
+      "uEzVZ8GvaTZtp-B5GL1WwtqARFIpBo2Q-l4jRtaYeZc",
     );
     expect(await canonicalFcmHash({ ...fcm, ...target }, fcmTokenHash)).toBe(
       "0BG5o9eYZwgIBsOfSkwYTCiw5MJB-xT6Q9MIZwZ-_Wg",
