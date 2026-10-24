@@ -13,12 +13,12 @@
     "test:coverage": "node ./scripts/coverage-unsupported.mjs"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.18.4",
-    "@cloudflare/workers-types": "5.20260710.1",
+    "@cloudflare/vitest-pool-workers": "0.23.0",
+    "@cloudflare/workers-types": "5.20261024.1",
     "typescript": "7.0.2",
-    "vitest": "4.1.10",
-    "wrangler": "4.110.0",
-    "oxlint": "1.75.0",
-    "oxlint-tsgolint": "7.0.2001"
+    "vitest": "4.1.12",
+    "wrangler": "4.152.0",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005"
   }
 }
