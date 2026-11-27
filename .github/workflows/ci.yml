@@ -61,7 +61,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: pnpm
-          wranglerVersion: 4.162.0
+          wranglerVersion: 4.169.0
           command: ${{ github.ref_name == 'production' && 'deploy' || 'deploy --env development' }}
       - name: Verify deployment health
         run: |
